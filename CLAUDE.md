@@ -8,9 +8,10 @@ Butterfly is the reference implementation of RJ Thomas's white paper (`docs/Butt
 
 ## Commands
 
-- Run tests: `pytest` (all 55 must pass before committing)
+- Run tests: `pytest` (all must pass before committing; the real-voice test skips if the Kokoro model isn't downloaded)
 - Run app: `.\start.ps1` (Windows) or `python -m butterfly`; `--demo` needs no model
 - Build UI: `cd frontend; npm run build`
+- Voice setup: `.\start.ps1 -SetupVoice` (Kokoro; model files live in `models/kokoro/`, never commit them)
 - UI dev server: `cd frontend; npm run dev` (proxies /api to port 8000)
 
 ## Rules for changes

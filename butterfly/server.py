@@ -12,7 +12,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -21,6 +21,7 @@ from .config import ButterflyConfig
 from .llm import LLMClient, LLMError, client_from_env
 from .personas import load_personas
 from .store import StateStore
+from .tts import KokoroTTS, TTSUnavailable
 
 ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / "frontend" / "dist"
@@ -29,6 +30,13 @@ DIST = ROOT / "frontend" / "dist"
 class ChatRequest(BaseModel):
     persona: str = "nova"
     message: str = Field(min_length=1, max_length=8000)
+
+
+class TTSRequest(BaseModel):
+    persona: str = "nova"
+    text: str = Field(min_length=1, max_length=4000)
+    voice: str | None = None
+    speed: float | None = Field(default=None, ge=0.5, le=2.0)
 
 
 class AgentPool:
@@ -70,12 +78,14 @@ def create_app(
     llm: LLMClient | None = None,
     data_dir: str | Path | None = None,
     config: ButterflyConfig | None = None,
+    tts=None,
 ) -> FastAPI:
     data_dir = Path(data_dir or os.getenv("BUTTERFLY_DATA", ROOT / "data"))
     llm = llm or client_from_env()
     config = config or ButterflyConfig()
     config.validate()
     pool = AgentPool(llm, StateStore(data_dir), load_personas(data_dir), config)
+    tts = tts or KokoroTTS()
 
     app = FastAPI(title="Butterfly", version="2.0.0")
     app.state.pool = pool
@@ -93,7 +103,7 @@ def create_app(
     @app.get("/api/personas")
     def personas():
         return [
-            {"key": k, "name": v["name"], "description": v["description"]}
+            {"key": k, "name": v["name"], "description": v["description"], "voice": v.get("voice")}
             for k, v in pool.personas.items()
         ]
 
@@ -122,6 +132,28 @@ def create_app(
             agent.reset(traits=spec["traits"], seed_rules=spec.get("seed_rules"))
             pool.store.delete(persona.lower())
             return agent.state()
+
+    @app.get("/api/tts")
+    def tts_status():
+        return tts.status()
+
+    @app.post("/api/tts")
+    def speak(req: TTSRequest):
+        key = req.persona.lower()
+        if key not in pool.personas:
+            raise HTTPException(404, f"Unknown persona '{key}'")
+        default = pool.personas[key].get("voice") or {}
+        voice = req.voice or default.get("name", "af_heart")
+        speed = req.speed if req.speed is not None else default.get("speed", 1.0)
+        try:
+            audio = tts.synthesize(req.text, voice=voice, speed=speed)
+        except TTSUnavailable as exc:
+            raise HTTPException(503, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(500, str(exc)) from exc
+        return Response(content=audio, media_type="audio/wav")
 
     if DIST.exists():
         app.mount("/assets", StaticFiles(directory=DIST / "assets"), name="assets")

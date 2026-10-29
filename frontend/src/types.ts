@@ -49,6 +49,14 @@ export interface Persona {
   key: string;
   name: string;
   description: string;
+  voice?: { name: string; speed?: number } | null;
+}
+
+export interface TTSStatus {
+  available: boolean;
+  engine: string;
+  voices: string[];
+  error: string | null;
 }
 
 export interface Health {

@@ -4,11 +4,13 @@
 #   .\start.ps1 -Demo           run without a model
 #   .\start.ps1 -Judge          let the model grade its own replies
 #   .\start.ps1 -Rebuild        force reinstall and UI rebuild
+#   .\start.ps1 -SetupVoice     install Kokoro voices (one time, ~350 MB download)
 param(
     [string]$Model = "",
     [switch]$Demo,
     [switch]$Judge,
     [switch]$Rebuild,
+    [switch]$SetupVoice,
     [int]$Port = 8000
 )
 
@@ -38,6 +40,12 @@ if ($Rebuild -or -not (Test-Path $marker)) {
     & $venvPy -m pip install --quiet --upgrade pip
     & $venvPy -m pip install --quiet -e ".[dev]"
     New-Item -ItemType File -Path $marker -Force | Out-Null
+}
+
+if ($SetupVoice) {
+    Write-Host "Installing Kokoro voice support..." -ForegroundColor Cyan
+    & $venvPy -m pip install --quiet -e ".[dev,voice]"
+    & $venvPy -m butterfly.tts download
 }
 
 if ($Rebuild -or -not (Test-Path "frontend\dist\index.html")) {

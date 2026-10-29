@@ -1,4 +1,4 @@
-import type { AgentState, Health, Persona, Turn } from "./types";
+import type { AgentState, Health, Persona, TTSStatus, Turn } from "./types";
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
@@ -21,6 +21,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   health: () => call<Health>("/health"),
   personas: () => call<Persona[]>("/personas"),
+  tts: () => call<TTSStatus>("/tts"),
   state: (persona: string) => call<AgentState>(`/state/${persona}`),
   reset: (persona: string) => call<AgentState>(`/reset/${persona}`, { method: "POST" }),
   chat: (persona: string, message: string) =>

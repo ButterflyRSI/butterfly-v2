@@ -73,6 +73,10 @@ button, textarea { font: inherit; color: inherit; }
 .tool[aria-pressed="true"] { border-color: var(--morpho); color: var(--morpho); }
 .tool:disabled { opacity: 0.5; cursor: default; }
 .tool--inspector { display: none; }
+.voice select {
+  border: 1px solid var(--line); background: var(--panel); border-radius: var(--radius-s);
+  padding: 5px 8px; font-size: 13px; max-width: 190px;
+}
 
 .banner { padding: 8px 20px; font-size: 14px; background: var(--amber-soft); border-bottom: 1px solid var(--line); }
 .banner--error { background: transparent; color: var(--rose); }

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import Inspector from "./components/Inspector";
 import ScoreMeter from "./components/ScoreMeter";
-import type { AgentState, ChatMessage, Health, Persona } from "./types";
+import { Speaker, sortVoices, voiceLabel } from "./speech";
+import type { AgentState, ChatMessage, Health, Persona, TTSStatus } from "./types";
 
 const speechSupported = typeof window !== "undefined" && "speechSynthesis" in window;
 
@@ -22,12 +23,6 @@ function store(key: string, value: string) {
   }
 }
 
-function speak(text: string) {
-  if (!speechSupported) return;
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
-}
-
 export default function App() {
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [persona, setPersona] = useState(() => readStored("butterfly.persona", "nova"));
@@ -39,11 +34,15 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [readAloud, setReadAloud] = useState(() => readStored("butterfly.readAloud", "off") === "on");
   const [showInspector, setShowInspector] = useState(false);
+  const [tts, setTts] = useState<TTSStatus | null>(null);
+  const [voiceChoice, setVoiceChoice] = useState<Record<string, string>>({});
+  const speaker = useRef(new Speaker());
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     api.personas().then(setPersonas).catch((e) => setError(e.message));
+    api.tts().then(setTts).catch(() => setTts(null));
     api.health().then(setHealth).catch(() =>
       setHealth({ ok: false, backend: "server", error: "Can't reach the Butterfly server. Is it running?" }),
     );
@@ -63,7 +62,13 @@ export default function App() {
   useEffect(() => {
     loadPersona(persona);
     store("butterfly.persona", persona);
+    speaker.current.stop();
   }, [persona, loadPersona]);
+
+  useEffect(() => {
+    const saved = readStored(`butterfly.voice.${persona}`, "");
+    setVoiceChoice((v) => (persona in v ? v : { ...v, [persona]: saved }));
+  }, [persona]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -80,7 +85,13 @@ export default function App() {
       const { turn, state: next } = await api.chat(persona, text);
       setMessages((m) => [...m, { role: "assistant", content: turn.response, turn }]);
       setState(next);
-      if (readAloud) speak(turn.response);
+      if (readAloud) {
+        speaker.current.speak(turn.response, {
+          persona,
+          voice: voiceChoice[persona] || undefined,
+          useKokoro: !!tts?.available,
+        });
+      }
     } catch (e) {
       setError((e as Error).message);
       setMessages((m) => m.slice(0, -1));
@@ -106,10 +117,22 @@ export default function App() {
     const next = !readAloud;
     setReadAloud(next);
     store("butterfly.readAloud", next ? "on" : "off");
-    if (!next && speechSupported) window.speechSynthesis.cancel();
+    if (!next) speaker.current.stop();
+  }
+
+  function chooseVoice(id: string) {
+    setVoiceChoice((v) => ({ ...v, [persona]: id }));
+    store(`butterfly.voice.${persona}`, id);
+    speaker.current.speak(`Hi, I'm ${current?.name ?? "here"}. This is how I sound.`, {
+      persona,
+      voice: id || undefined,
+      useKokoro: true,
+    });
   }
 
   const current = personas.find((p) => p.key === persona);
+  const canSpeak = speechSupported || !!tts?.available;
+  const defaultVoice = current?.voice?.name;
   const threshold = state?.config.quality_threshold ?? 0.65;
 
   return (
@@ -133,10 +156,23 @@ export default function App() {
           <span className={`status ${health?.ok ? "ok" : "bad"}`} title={health?.error ?? health?.backend ?? ""}>
             {health ? (health.ok ? health.backend : "Model offline") : "Checking model"}
           </span>
-          {speechSupported && (
+          {canSpeak && (
             <button className="tool" aria-pressed={readAloud} onClick={toggleReadAloud}>
               {readAloud ? "Reading aloud" : "Read aloud"}
             </button>
+          )}
+          {tts?.available && (
+            <label className="voice">
+              <span className="sr-only">Voice for {current?.name}</span>
+              <select value={voiceChoice[persona] ?? ""} onChange={(e) => chooseVoice(e.target.value)}>
+                <option value="">{defaultVoice ? `${voiceLabel(defaultVoice)} (default)` : "Default voice"}</option>
+                {sortVoices(tts.voices).map((v) => (
+                  <option key={v} value={v}>
+                    {voiceLabel(v)}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
           <button className="tool tool--inspector" aria-pressed={showInspector} onClick={() => setShowInspector((v) => !v)}>
             {showInspector ? "Show chat" : "Show state"}

@@ -36,6 +36,7 @@ Options:
 .\start.ps1 -Model qwen2.5:14b    # use a different Ollama model
 .\start.ps1 -Demo                 # no model needed; a built-in mock answers
 .\start.ps1 -Judge                # the model grades its own replies instead of the heuristics
+.\start.ps1 -SetupVoice           # add natural local voices (one time, ~350 MB)
 ```
 
 If PowerShell refuses to run the script, allow local scripts once with
@@ -66,6 +67,18 @@ Butterfly is model-agnostic. Pick a backend with environment variables:
 | `OPENAI_API_KEY` | | if the server needs one |
 | `BUTTERFLY_DATA` | `./data` | where saved state lives |
 
+## Voices
+
+**Read aloud** uses the browser's built-in voice until you install Kokoro, a free voice model that runs offline on your PC:
+
+```powershell
+.\start.ps1 -SetupVoice
+```
+
+That installs it and downloads the model into `models/kokoro/` (ignored by git). After that, a voice menu appears next to Read aloud with 50+ voices; picking one plays a short sample, and each persona remembers its own choice. Persona defaults are set with a `voice` entry, for example `"voice": {"name": "af_nova", "speed": 1.0}`. Nova uses `af_nova` and Echo uses `am_michael`. List every voice with `python -m butterfly.tts voices`.
+
+Long replies are read in chunks, so the first sentence starts quickly while the rest is generated. If Kokoro isn't available, it falls back to the browser voice.
+
 ## Using it as a library
 
 ```python
@@ -92,7 +105,8 @@ Two personas from the original build ship by default: **Nova** (warm, curious) a
     "name": "Sage",
     "description": "You are calm and patient.",
     "traits": {"curious": 0.5, "formal": 0.4, "verbose": 0.4},
-    "seed_rules": ["Avoid slang in replies."]
+    "seed_rules": ["Avoid slang in replies."],
+    "voice": {"name": "bf_emma", "speed": 1.0}
   }
 }
 ```
@@ -112,8 +126,9 @@ butterfly/
   server.py        FastAPI API and UI hosting
   personas.py      Nova, Echo, and custom personas
   store.py         saves state to JSON between runs
+  tts.py           Kokoro text-to-speech (optional)
 frontend/          React + TypeScript UI
-tests/             55 tests: unit, integration, long-run simulations, API
+tests/             63 tests: unit, integration, simulations, API, voice
 docs/              white paper and implementation notes
 ```
 

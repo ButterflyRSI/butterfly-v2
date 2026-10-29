@@ -18,6 +18,7 @@ DEFAULT_PERSONAS: dict[str, dict] = {
         ),
         "traits": {"curious": 0.7, "formal": 0.3, "verbose": 0.5},
         "seed_rules": [],
+        "voice": {"name": "af_nova", "speed": 1.0},
     },
     "echo": {
         "name": "Echo",
@@ -27,6 +28,7 @@ DEFAULT_PERSONAS: dict[str, dict] = {
         ),
         "traits": {"curious": 0.4, "formal": 0.6, "verbose": 0.3},
         "seed_rules": [],
+        "voice": {"name": "am_michael", "speed": 1.0},
     },
 }
 
@@ -42,5 +44,6 @@ def load_personas(data_dir: Path | None = None) -> dict[str, dict]:
                 spec.setdefault("name", key.title())
                 spec.setdefault("description", "")
                 spec.setdefault("seed_rules", [])
+                spec.setdefault("voice", {"name": "af_heart", "speed": 1.0})
                 personas[key.lower()] = spec
     return personas
